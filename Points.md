@@ -1,5 +1,5 @@
 
-# 🐟 Fish Points (Unredeemable Template)
+# 🐟 Fish Points
 ### Reputation System for Fish Pools
 
 ---
@@ -280,7 +280,7 @@ Fish Points are designed to:
 
 ## Summary
 
-Fish Points (Unredeemable) provides a **simple but powerful reputation system** for Fish Pools.
+Fish Points provides a **simple but powerful reputation system** for Fish Pools.
 
 It combines:
 
