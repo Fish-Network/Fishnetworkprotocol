@@ -140,6 +140,8 @@ contract VotingModule is IVotingModule {
 
     function setAdmin(address newAdmin) external onlyAdmin {
         if (newAdmin == address(0)) revert ZeroAddress();
+        address old = admin;
         admin = newAdmin;
+        emit AdminUpdated(old, newAdmin);
     }
 }

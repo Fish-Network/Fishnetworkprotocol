@@ -10,6 +10,7 @@ interface IVotingModule {
     event VoteCast(uint256 indexed poolId, address indexed voter, Outcome choice, uint64 castAt);
     event WinningOutcomeRecorded(uint256 indexed poolId, Outcome winning);
     event VoteFPClaimed(uint256 indexed poolId, address indexed voter, uint256 raw);
+    event AdminUpdated(address indexed oldAdmin, address indexed newAdmin);
 
     // Called by Factory at pool creation.
     function authorizePool(address pool, uint256 poolId) external;
