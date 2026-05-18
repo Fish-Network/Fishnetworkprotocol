@@ -329,4 +329,124 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
             emit PoolDistributed(poolId);
         }
     }
+
+    // ===== Capital actions =====
+
+    function deposit(uint256 amount, address receiver)
+        external override nonReentrant inState(LifecycleState.Open)
+    {
+        if (receiver == address(0)) revert ZeroAddress();
+        if (amount == 0)             revert MinContribution();
+        if (amount < minContribution) revert MinContribution();
+        if (maxContribution > 0 && amount > maxContribution) revert MaxContribution();
+
+        uint256 newTotal = totalAssetsCommitted + amount;
+        if (newTotal > uint256(poolCap)) revert CapExceeded();
+
+        // Membership auto-mint
+        if (!IMembershipModule(membershipModule).hasMembership(poolId, receiver)) {
+            IMembershipModule(membershipModule).mintMembership(poolId, receiver);
+        }
+
+        IERC20(acceptedAsset).safeTransferFrom(msg.sender, address(this), amount);
+
+        // Mint LP units (non-transferable)
+        _balances[receiver] += amount;
+        _totalSupply        += amount;
+        totalAssetsCommitted = newTotal;
+
+        if (!_isDepositor[receiver]) {
+            _isDepositor[receiver] = true;
+            _depositors.push(receiver);
+        }
+
+        uint256 depositId = _userDeposits[receiver].length;
+        _userDeposits[receiver].push(Deposit({
+            amount: uint128(amount),
+            depositedAt: uint64(block.timestamp),
+            finalizedAt: 0
+        }));
+
+        IReputationModule(reputationModule).recordDeposit(
+            receiver, poolId, _packId(receiver, depositId), amount, uint64(block.timestamp)
+        );
+
+        emit DepositMade(poolId, receiver, depositId, amount, uint64(block.timestamp));
+    }
+
+    function withdraw(uint256 depositId) external override nonReentrant {
+        if (lifecycleState != LifecycleState.Open && lifecycleState != LifecycleState.Active)
+            revert WrongState(LifecycleState.Open, lifecycleState);
+        Deposit storage d = _findDeposit(msg.sender, depositId);
+        if (d.finalizedAt != 0) revert DepositAlreadyFinalized(depositId);
+        uint128 amount = d.amount;
+        d.finalizedAt = uint64(block.timestamp);
+
+        _balances[msg.sender] -= amount;
+        _totalSupply          -= amount;
+        totalAssetsCommitted  -= uint256(amount);
+
+        IERC20(acceptedAsset).safeTransfer(msg.sender, uint256(amount));
+
+        IReputationModule(reputationModule).finalizeCapital(
+            msg.sender, poolId, _packId(msg.sender, depositId), uint64(block.timestamp)
+        );
+
+        emit Withdrawn(poolId, msg.sender, depositId, uint256(amount), uint64(block.timestamp));
+    }
+
+    function refund(uint256 depositId)
+        external override nonReentrant inState(LifecycleState.Failed)
+    {
+        Deposit storage d = _findDeposit(msg.sender, depositId);
+        if (d.finalizedAt != 0) revert DepositAlreadyFinalized(depositId);
+        uint128 amount = d.amount;
+        d.finalizedAt = uint64(block.timestamp);
+
+        _balances[msg.sender] -= amount;
+        _totalSupply          -= amount;
+        totalAssetsCommitted  -= uint256(amount);
+
+        IERC20(acceptedAsset).safeTransfer(msg.sender, uint256(amount));
+
+        IReputationModule(reputationModule).finalizeCapital(
+            msg.sender, poolId, _packId(msg.sender, depositId), uint64(block.timestamp)
+        );
+
+        emit Refunded(poolId, msg.sender, depositId, uint256(amount), uint64(block.timestamp));
+    }
+
+    function claimCapitalFP(uint256 depositId) external override {
+        if (lifecycleState != LifecycleState.Settled && lifecycleState != LifecycleState.Distributed)
+            revert WrongState(LifecycleState.Settled, lifecycleState);
+        Deposit storage d = _findDeposit(msg.sender, depositId);
+        if (d.finalizedAt != 0) revert DepositAlreadyFinalized(depositId);
+        d.finalizedAt = settledAt;
+
+        IReputationModule(reputationModule).finalizeCapital(
+            msg.sender, poolId, _packId(msg.sender, depositId), settledAt
+        );
+    }
+
+    function _findDeposit(address user, uint256 depositId) internal view returns (Deposit storage) {
+        if (depositId >= _userDeposits[user].length) revert DepositNotFound(depositId);
+        return _userDeposits[user][depositId];
+    }
+
+    /// @dev Compose a unique (poolId, user, idx) → depositId by hashing. Single uint256 keyspace for RepModule.
+    function _packId(address user, uint256 idx) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(user, idx)));
+    }
+
+    // ===== Voting =====
+
+    function castVote(Outcome choice) external override inState(LifecycleState.Active) {
+        if (!IMembershipModule(membershipModule).hasMembership(poolId, msg.sender)) revert NotMember();
+        // Anti-front-run: caller must have joined before the round opened.
+        (uint64 roundStart, , ) = IVotingModule(votingModule).getRound(poolId);
+        uint64 joined = IMembershipModule(membershipModule).mintedAt(poolId, msg.sender);
+        if (joined == 0 || joined > roundStart) revert NotMember();
+
+        IVotingModule(votingModule).castVote(poolId, msg.sender, choice);
+    }
 }
