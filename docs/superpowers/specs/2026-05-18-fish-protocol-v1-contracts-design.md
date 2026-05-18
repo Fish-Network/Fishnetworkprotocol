@@ -674,6 +674,54 @@ Add Example 11 — same setup as Example 8, but with DF = 0.5×. Demonstrates ho
 - Clarify `Open ≠ Active`: Open is deposits-only; Active is voting-only with deposits frozen.
 - Add note about pro-rata distribution paginated via `distribute(offset, count)`.
 
+### New deep-dive docs in `contracts/`
+
+These three live in `contracts/` (next to the code they describe) so the top-level `README.md` stays a high-level overview rather than a 2000-line reference. README links to them.
+
+#### `contracts/TestPlan.md`
+
+Manual verification checklist (we have no in-repo toolchain). Sections:
+
+- **Setup** — Recommended environments: Remix for one-off checks, local Foundry / Hardhat clone of the repo's `.sol` files for repeatable runs.
+- **Per-contract smoke tests** — Constructor sanity, role gating, basic getters work.
+- **Lifecycle happy path** — Draft → Open → Active → Closed → Settled → Distributed with deposits, votes, claims, and pro-rata payout. Expected FP for each participant at each step.
+- **Failed pool path** — SuccessRule unmet → Failed → refund flow → FP_capital materializes on refund.
+- **Force-close path** — Organizer abandons in Open after closeTime; anyone calls closePool; pool routes to Failed.
+- **Pause/unpause** — From each non-terminal state; verify `_prePauseState` restores correctly.
+- **Anti-gaming** — 14-day cooldown rejection; max-3-active rejection; paused pool still counts.
+- **DF behavior** — Three pools with DF = 0.5×, 1.0×, 2.0×; verify per-pool and wallet-level totals match Section 7 invariants. DF lock at Open is irreversible.
+- **Idempotency** — Every key in the table cannot double-mint; replayed calls return silently.
+- **Capital math** — Per-deposit time-held tracking: deposit at t0, withdraw at t0+15d → 50% of base FP. Multiple deposits from same wallet accumulate independently.
+- **Voting math** — Early correct, early incorrect, late correct, late incorrect, revote-then-correct — all five buckets from `PointsExamples.md`.
+- **Invariants** — Acceptance criteria from Section 13 spot-checked manually after each scenario.
+- **Negative tests** — Unauthorized calls revert with the correct error; wrong-state actions revert; ERC20 transfer failures bubble up.
+
+#### `contracts/statemachine.md`
+
+Deep dive on the lifecycle. Sections:
+
+- Expanded mermaid state diagram (more detail than the README version).
+- Each transition: trigger function, caller, preconditions, side-effects, events emitted, idempotency keys touched.
+- Pause semantics: orthogonal mode, `_prePauseState` snapshot, terminal-state immunity.
+- Force-close path from Open and Active when closeTime has elapsed.
+- Why Open ≠ Active (deposits vs voting separation — kills late-deposit-for-early-vote-bonus race).
+- Failed branch and its FP implications (participation FP yes, accuracy bonus no, capital FP on refund).
+- Settle → Distribute payment math snapshot reasoning.
+- Anti-patterns: things that look like valid transitions but aren't.
+
+#### `contracts/storagelayout.md`
+
+Per-contract storage layout reference. Sections:
+
+- One subsection per contract: slot-by-slot layout, packing reasoning, gas cost notes.
+- Immutable vs storage variables called out explicitly.
+- Mapping key composition rules (`mapping(address => mapping(uint256 => ...))`).
+- Clone vs implementation distinction: clones share implementation code but each has its own storage; immutables baked at clone time vs at implementation time.
+- DF and idempotency-key storage on `ReputationPoints` / `ReputationModule`.
+- Upgrade considerations: once a clone is deployed, its storage layout is frozen. Future v2 cannot reuse slot positions if they want to upgrade in place.
+
+These three are static reference docs — they describe the design as implemented, not the design process. They get committed alongside the contracts in the same phase as the README rewrite.
+
 ---
 
 ## 13. Acceptance criteria
@@ -690,6 +738,7 @@ A reviewer should be able to verify the following without writing tests:
 8. `poolDF` cannot be modified after `lockPoolDF` is called (function reverts; no setter exists for locked pools).
 9. The DF default of `10_000` in pool creation produces FP values identical to the doc's pre-DF examples.
 10. README contains at least five mermaid diagrams covering topology, lifecycle, FP flow, voting, and permissions.
+11. `contracts/TestPlan.md`, `contracts/statemachine.md`, and `contracts/storagelayout.md` exist and cover the topics listed in Section 12.
 
 ---
 
@@ -721,7 +770,8 @@ Implementation will be planned in the writing-plans skill output. For reference,
 8. **UnredeemablePoolFactory** (clone deployment, anti-gaming, module wiring).
 9. **Documentation** (Points.md, FishPointsOverview.md, DeveloperDocs.md, PointsExamples.md, Poolsreadme.md).
 10. **README rewrite** with mermaid diagrams.
-11. **Delete** obsolete files (`IContributionModule.sol`, old `UnredeemablePoolTypes.sol` after extraction).
+11. **New deep-dive docs** in `contracts/`: `TestPlan.md`, `statemachine.md`, `storagelayout.md`.
+12. **Delete** obsolete files (`IContributionModule.sol`, old `UnredeemablePoolTypes.sol` after extraction).
 
 Each phase is independently reviewable. No phase requires changes to a prior phase except where a later phase reveals an interface gap.
 
