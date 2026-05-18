@@ -37,6 +37,33 @@ Reputation from:
 
 ---
 
+## Discount Factor (DF)
+
+DF is a per-pool multiplier applied to all FP issued in that pool.
+
+- Set at pool creation (within `[minCoeffBps, maxCoeffBps]` bounds).
+- Mutable in `Draft`; locked at `Draft → Open` transition.
+- Applied at READ time via the cached `effectiveTotal` field; raw FP is stored unscaled.
+
+## New ReputationPoints API
+
+```text
+getCapitalPoints(user)         → raw FP_capital sum across all pools
+getParticipationPoints(user)   → raw FP_participation sum across all pools
+getTotalPoints(user)           → cached effective total (Σ raw × DF per pool)
+getPoolCapital(user, poolId)   → raw capital in one pool
+getPoolParticipation(user, p)  → raw participation in one pool
+getPoolTotal(user, poolId)     → (raw cap + raw part) × DF for one pool
+poolDF(poolId)                 → DF for the pool, 0 if not yet locked
+poolDFLocked(poolId)           → whether DF is finalized
+```
+
+**Invariant per pool:** `getPoolTotal == (getPoolCapital + getPoolParticipation) × DF / 10_000`.
+
+**Invariant across pools:** `getTotalPoints == Σ over pools p of (rawCap(u,p) + rawPart(u,p)) × DF(p) / 10_000`. Collapses to `(getCap + getPart) × DF` only when every participated pool has the same DF.
+
+---
+
 ## Key Principles
 
 When building on top of Fish Points:
@@ -290,12 +317,11 @@ All FP events must be treated as idempotent.
 
 ### Example Keys
 
-* `pool_open:{pool_id}`
-* `pool_settled:{pool_id}`
-* `pool_first_distribution:{pool_id}`
-* `vote_fp:{vote_id}`
-* `capital_withdrawal:{deposit_id}`
-* `capital_settlement:{deposit_id}`
+```text
+keccak256("FP:capital:fin", poolId, depositId)
+keccak256("FP:vote",        poolId, user)
+keccak256("FP:org",         poolId, uint8(milestone))
+```
 
 ### Integration Rule
 
@@ -411,6 +437,8 @@ You can rely on:
 * final vote scoring only
 * settlement-gated accuracy
 * capital finalized at withdrawal/settlement
+* `poolDF` is immutable once locked.
+* `getTotalPoints` is computed by accumulator, not iteration — gas-safe for arbitrarily many pools per wallet.
 
 ---
 
