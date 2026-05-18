@@ -13,7 +13,7 @@ Fish Network is a reputation-based capital coordination system. Two halves:
 - **Fish Pools** — structured environments for capital formation and execution.
 - **Fish Points (FP)** — a non-transferable reputation system, computed as `FP_total = (FP_capital + FP_participation) × DF`, where `DF` is a per-pool discount factor (default 1.0×).
 
-The unredeemable template is the simpler of two templates (the other, redeemable, handles attestation-driven financial execution and is out of scope here).
+This document and the v1 implementation cover the **unredeemable** template only. Attestation-driven financial execution is out of scope.
 
 ### Current repo state
 
@@ -36,7 +36,7 @@ The unredeemable template is the simpler of two templates (the other, redeemable
 
 ### Non-goals (v1)
 
-- Organizer-driven capital release for off-chain financial execution (redeemable template's job).
+- Organizer-driven capital release for off-chain financial execution.
 - Multi-proposal voting (single binary outcome per pool only).
 - 2-step admin handoff, timelocks, on-chain multi-sig.
 - Rolling 180-day score (view-layer concern, off-chain).
@@ -752,7 +752,7 @@ A reviewer should be able to verify the following without writing tests:
 | `Failed` pools grant `FP_capital` based on time-to-refund | Per docs | Reassess if it incentivizes bad pools |
 | Gas cost of `distribute` for huge pools | Mitigated by pagination | None |
 | `getTotalPoints` aggregation cached only on mint | Acceptable (DF immutable) | None |
-| No organizer-driven release / return of capital for off-chain execution | Out of scope | Redeemable template |
+| No organizer-driven release / return of capital for off-chain execution | Out of scope | Not addressed in v1 |
 
 ---
 
@@ -785,7 +785,6 @@ Items deliberately deferred:
 - Deploy scripts / addresses.
 - Subgraph / indexer code.
 - Frontend integrations.
-- Redeemable template.
 - Multi-proposal voting.
 - 180-day rolling score view.
 - FP burning / slashing.

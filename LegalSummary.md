@@ -161,7 +161,7 @@ They are:
 
 ## 7. Data & Evidence Model (Unredeemable)
 
-Unlike the redeemable template:
+In the unredeemable template:
 
 - no formal attestation registry exists  
 - no formal verification of financial outcomes is required  
