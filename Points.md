@@ -35,6 +35,24 @@ FP_{total} = FP_{capital} + FP_{participation}
 * **FP(participation)** → behavior and outcomes
 ---
 
+## Discount Factor (DF)
+
+Each pool carries a **Discount Factor** (DF) — a multiplier on the FP issued in that pool.
+
+```math
+FP_{total} = (FP_{capital} + FP_{participation}) \times DF
+```
+
+- **Default:** DF = 1.0× (no change vs. the base formula).
+- **Range:** DF is bounded by protocol-level `minCoeffBps` and `maxCoeffBps` (default 0.1× – 5.0×).
+- **Set by:** the organizer when creating the pool; mutable while the pool is in `Draft`.
+- **Locked:** DF becomes **immutable** the moment the pool transitions to `Open` (the first organizer milestone). After lock, no setter exists; even the protocol admin cannot change it.
+- **Storage:** `FP_capital` and `FP_participation` are stored **raw** (pre-DF). The effective DF-scaled total is cached on-chain for fast reads.
+
+This lets the protocol tune the reputation weight of individual pools without retroactively rewriting history.
+
+---
+
 ## System Scope
 
 ### Included
