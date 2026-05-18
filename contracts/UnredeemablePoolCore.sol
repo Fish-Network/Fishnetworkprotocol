@@ -6,7 +6,6 @@ import {IUnredeemablePoolFactory} from "./interfaces/IUnredeemablePoolFactory.so
 import {IMembershipModule} from "./interfaces/IMembershipModule.sol";
 import {IVotingModule} from "./interfaces/IVotingModule.sol";
 import {IReputationModule} from "./interfaces/IReputationModule.sol";
-import {IReputationPoints} from "./interfaces/IReputationPoints.sol";
 import {IERC20} from "./interfaces/IERC20.sol";
 import {IERC20Metadata} from "./interfaces/IERC20Metadata.sol";
 import {SafeERC20} from "./libraries/SafeERC20.sol";
@@ -91,7 +90,6 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
     // Depositor enumeration for distribution
     address[] internal _depositors;
     mapping(address => bool) internal _isDepositor;
-    mapping(address => uint256) internal _unitsAtSettle;
     mapping(address => bool) internal _distributed;
     uint256 internal _processedCount;
 
@@ -243,7 +241,12 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
         if (lifecycleState != LifecycleState.Open && lifecycleState != LifecycleState.Active)
             revert WrongState(LifecycleState.Active, lifecycleState);
 
-        IVotingModule(votingModule).closeRound(poolId, uint64(block.timestamp));
+        // Only close the voting round if it was ever opened — i.e. the pool reached Active.
+        // Open-state force-close means activatePool was never called, so VotingModule.openRound
+        // was never called either; calling closeRound here would revert with RoundNotOpen.
+        if (lifecycleState == LifecycleState.Active) {
+            IVotingModule(votingModule).closeRound(poolId, uint64(block.timestamp));
+        }
 
         bool success = _evaluateSuccess();
         _transitionTo(LifecycleState.Closed);
@@ -284,10 +287,10 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
         totalSupplyAtSettle = _totalSupply;
         winningOutcome      = winning;
 
-        // Snapshot per-depositor units for distribution math.
-        for (uint256 i = 0; i < _depositors.length; i++) {
-            _unitsAtSettle[_depositors[i]] = _balances[_depositors[i]];
-        }
+        // Per-depositor units are *not* snapshotted here. Once Settled, every state-change path that
+        // touches balances (withdraw, refund, deposit) is gated on a different state, so _balances[d]
+        // is frozen for the lifetime of Settled. distribute() reads _balances[d] directly.
+        // Spec section 5: "Settle (no per-user loop)".
 
         _transitionTo(LifecycleState.Settled);
         IVotingModule(votingModule).recordWinningOutcome(poolId, winning);
@@ -297,7 +300,7 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
     }
 
     function distribute(uint256 offset, uint256 count)
-        external override inState(LifecycleState.Settled)
+        external override nonReentrant inState(LifecycleState.Settled)
     {
         uint256 n = _depositors.length;
         uint256 end = offset + count;
@@ -307,7 +310,7 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
         for (uint256 i = offset; i < end; i++) {
             address d = _depositors[i];
             if (_distributed[d]) continue;
-            uint256 units = _unitsAtSettle[d];
+            uint256 units = _balances[d];
             if (units == 0) { _distributed[d] = true; _processedCount += 1; continue; }
             uint256 share = (units * poolBalanceAtSettle) / totalSupplyAtSettle;
             _distributed[d] = true;
@@ -433,7 +436,9 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
         return _userDeposits[user][depositId];
     }
 
-    /// @dev Compose a unique (poolId, user, idx) → depositId by hashing. Single uint256 keyspace for RepModule.
+    /// @dev Compose a unique `(user, idx) → depositId` by hashing.
+    ///      `poolId` is the outer key in ReputationModule's deposit mapping so collisions across
+    ///      pools cannot occur. Idempotency keys via FishKeys.capitalFin DO include poolId.
     function _packId(address user, uint256 idx) internal pure returns (uint256) {
         return uint256(keccak256(abi.encodePacked(user, idx)));
     }
