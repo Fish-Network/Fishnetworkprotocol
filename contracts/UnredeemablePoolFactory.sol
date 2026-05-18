@@ -28,12 +28,13 @@ contract UnredeemablePoolFactory is IUnredeemablePoolFactory {
     address public reputationPoints;
     address public poolImplementation;
 
+    // Packed together into one storage slot (8 + 2 + 2 + 2 + 1 = 15 bytes ≤ 32).
     uint64  public override cooldownDuration = 14 days;
     uint16  public override maxActivePoolsPerOrganizer = 3;
     uint16  public override minCoeffBps = 1000;
     uint16  public override maxCoeffBps = 50_000;
-    uint256 public nextPoolId = 1;
     bool    public createPaused_;
+    uint256 public nextPoolId = 1;
 
     mapping(uint256 => address) public override poolById;
     mapping(address => uint256) public override poolIdByAddress;
