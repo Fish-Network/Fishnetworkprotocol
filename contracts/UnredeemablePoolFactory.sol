@@ -1,179 +1,150 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import {IContributionModule} from "./interfaces/IContributionModule.sol";
-import {IMembershipModule} from "./interfaces/IMembershipModule.sol";
-import {IReputationModule} from "./interfaces/IReputationModule.sol";
+import {IUnredeemablePoolFactory} from "./interfaces/IUnredeemablePoolFactory.sol";
 import {IUnredeemablePoolCore} from "./interfaces/IUnredeemablePoolCore.sol";
+import {IMembershipModule} from "./interfaces/IMembershipModule.sol";
+import {IVotingModule} from "./interfaces/IVotingModule.sol";
+import {IReputationModule} from "./interfaces/IReputationModule.sol";
+import {UnredeemablePoolConfig, UnredeemableModuleSet} from "./types/PoolConfig.sol";
 import {MinimalClones} from "./libraries/MinimalClones.sol";
-import {ReputationConfig, UnredeemableModuleSet, UnredeemablePoolConfig} from "./types/UnredeemablePoolTypes.sol";
 
-contract UnredeemablePoolFactory {
-    enum ModuleType {
-        Membership,
-        Contribution,
-        Reputation
-    }
-
-    error Unauthorized();
+contract UnredeemablePoolFactory is IUnredeemablePoolFactory {
+    error NotAdmin();
+    error NotRegisteredPool();
     error ZeroAddress();
     error InvalidConfig();
-    error InvalidTimeRange();
-    error InvalidContributionBounds();
-    error InvalidPoolCap();
-    error UnapprovedModule(ModuleType moduleType, address module);
-    error InvalidReputationConfig();
+    error CreatePaused();
+    error DFOutOfBounds();
+    error CooldownActive();
+    error MaxActiveReached();
+    error UnderflowOnFinalize();
+    error BoundsInvalid();
 
-    event ProtocolAdminUpdated(address indexed previousAdmin, address indexed newAdmin);
-    event PoolImplementationUpdated(address indexed previousImplementation, address indexed newImplementation);
-    event ModuleApprovalSet(ModuleType indexed moduleType, address indexed module, bool approved);
-    event UnredeemablePoolCreated(
-        address indexed pool,
-        uint256 indexed poolId,
-        uint256 indexed templateId,
-        uint256 templateVersion,
-        address creator,
-        address organizer,
-        address poolOperator,
-        address protocolAdmin,
-        address acceptedAsset,
-        bytes32 metadataHash
-    );
-    event ModulesAttached(
-        address indexed pool,
-        address indexed membershipModule,
-        address indexed contributionModule,
-        address reputationModule
-    );
-    event ConfigReference(address indexed pool, bytes32 metadataHash, bytes32 reputationConfigHash);
-
-    address public protocolAdmin;
+    address public override admin;
+    address public membershipModule;
+    address public votingModule;
+    address public reputationModule;
+    address public reputationPoints;
     address public poolImplementation;
 
-    mapping(address => bool) public approvedMembershipModules;
-    mapping(address => bool) public approvedContributionModules;
-    mapping(address => bool) public approvedReputationModules;
+    uint64  public override cooldownDuration = 14 days;
+    uint16  public override maxActivePoolsPerOrganizer = 3;
+    uint16  public override minCoeffBps = 1000;
+    uint16  public override maxCoeffBps = 50_000;
+    uint256 public nextPoolId = 1;
+    bool    public createPaused_;
 
-    modifier onlyProtocolAdmin() {
-        if (msg.sender != protocolAdmin) revert Unauthorized();
-        _;
+    mapping(uint256 => address) public override poolById;
+    mapping(address => uint256) public override poolIdByAddress;
+    mapping(address => uint16)  public override activePoolCount;
+    mapping(address => uint64)  public override lastOpenedAt;
+    address[] public allPools;
+
+    modifier onlyAdmin() { if (msg.sender != admin) revert NotAdmin(); _; }
+    modifier onlyRegisteredPool() { if (poolIdByAddress[msg.sender] == 0) revert NotRegisteredPool(); _; }
+
+    constructor(address initialAdmin) {
+        if (initialAdmin == address(0)) revert ZeroAddress();
+        admin = initialAdmin;
+        // Modules are wired up via setModules() AFTER they're deployed (which depend on this Factory's address).
+        // createPool will revert until setModules has been called.
     }
 
-    constructor(address initialProtocolAdmin, address initialPoolImplementation) {
-        if (initialProtocolAdmin == address(0) || initialPoolImplementation == address(0)) revert ZeroAddress();
-        protocolAdmin = initialProtocolAdmin;
-        poolImplementation = initialPoolImplementation;
-    }
-
-    function setProtocolAdmin(address newProtocolAdmin) external onlyProtocolAdmin {
-        if (newProtocolAdmin == address(0)) revert ZeroAddress();
-        emit ProtocolAdminUpdated(protocolAdmin, newProtocolAdmin);
-        protocolAdmin = newProtocolAdmin;
-    }
-
-    function setPoolImplementation(address newPoolImplementation) external onlyProtocolAdmin {
-        if (newPoolImplementation == address(0)) revert ZeroAddress();
-        emit PoolImplementationUpdated(poolImplementation, newPoolImplementation);
-        poolImplementation = newPoolImplementation;
-    }
-
-    function setModuleApproval(ModuleType moduleType, address module, bool approved) external onlyProtocolAdmin {
-        if (module == address(0)) revert ZeroAddress();
-
-        if (moduleType == ModuleType.Membership) {
-            approvedMembershipModules[module] = approved;
-        } else if (moduleType == ModuleType.Contribution) {
-            approvedContributionModules[module] = approved;
-        } else {
-            approvedReputationModules[module] = approved;
-        }
-
-        emit ModuleApprovalSet(moduleType, module, approved);
-    }
-
-    function createUnredeemablePool(
-        UnredeemablePoolConfig calldata config,
-        ReputationConfig calldata reputationConfig,
-        UnredeemableModuleSet calldata modules
-    ) external returns (address pool) {
-        _validateConfig(config);
-        _validateModules(modules);
-        _validateReputationConfig(reputationConfig);
-
-        // Explicitly touch required module interfaces as a safety check that they are contracts.
-        IMembershipModule(modules.membershipModule).moduleId();
-        IContributionModule(modules.contributionModule).moduleId();
-        IReputationModule(modules.reputationModule).moduleId();
-
-        pool = MinimalClones.clone(poolImplementation);
-        IUnredeemablePoolCore(pool).initialize(config, reputationConfig, modules, address(this));
-
-        emit UnredeemablePoolCreated(
-            pool,
-            config.poolId,
-            config.templateId,
-            config.templateVersion,
-            config.creator,
-            config.organizer,
-            config.poolOperator,
-            config.protocolAdmin,
-            config.acceptedAsset,
-            config.metadataHash
-        );
-        emit ModulesAttached(pool, modules.membershipModule, modules.contributionModule, modules.reputationModule);
-        emit ConfigReference(pool, config.metadataHash, keccak256(abi.encode(reputationConfig)));
-    }
-
-    function _validateConfig(UnredeemablePoolConfig calldata config) internal view {
-        if (
-            config.creator == address(0) || config.organizer == address(0) || config.poolOperator == address(0)
-                || config.protocolAdmin == address(0)
-        ) revert InvalidConfig();
-        if (config.protocolAdmin != protocolAdmin) revert InvalidConfig();
+    function createPool(UnredeemablePoolConfig calldata config, uint16 initialDFBps)
+        external override returns (address pool, uint256 poolId)
+    {
+        if (createPaused_) revert CreatePaused();
+        if (poolImplementation == address(0)) revert ZeroAddress();
+        if (initialDFBps < minCoeffBps || initialDFBps > maxCoeffBps) revert DFOutOfBounds();
         if (config.acceptedAsset == address(0)) revert InvalidConfig();
-        if (config.openTime >= config.closeTime || config.closeTime <= block.timestamp) revert InvalidTimeRange();
-        if (config.minContribution > config.maxContribution) revert InvalidContributionBounds();
-        if (config.poolCap == 0) revert InvalidPoolCap();
+        if (config.poolCap == 0)                revert InvalidConfig();
+        if (bytes(config.name).length == 0)     revert InvalidConfig();
+
+        poolId = nextPoolId++;
+        pool   = MinimalClones.clone(poolImplementation);
+
+        poolById[poolId]         = pool;
+        poolIdByAddress[pool]    = poolId;
+        allPools.push(pool);
+
+        UnredeemableModuleSet memory modules = UnredeemableModuleSet({
+            membershipModule: membershipModule,
+            votingModule:     votingModule,
+            reputationModule: reputationModule,
+            reputationPoints: reputationPoints
+        });
+
+        IUnredeemablePoolCore(pool).initialize(poolId, config, modules, msg.sender, initialDFBps, address(this));
+
+        IMembershipModule(membershipModule).setPoolMinter(pool, true);
+        IVotingModule(votingModule).authorizePool(pool, poolId);
+        IReputationModule(reputationModule).authorizePool(pool, poolId, initialDFBps);
+
+        emit PoolCreated(poolId, pool, msg.sender, config.acceptedAsset, initialDFBps);
     }
 
-    function _validateModules(UnredeemableModuleSet calldata modules) internal view {
-        if (modules.membershipModule == address(0) || modules.contributionModule == address(0) || modules.reputationModule == address(0)) {
+    function registerPoolOpen(address organizer) external override onlyRegisteredPool {
+        uint64 last = lastOpenedAt[organizer];
+        if (last != 0 && block.timestamp < uint256(last) + uint256(cooldownDuration)) revert CooldownActive();
+        if (activePoolCount[organizer] >= maxActivePoolsPerOrganizer) revert MaxActiveReached();
+
+        lastOpenedAt[organizer] = uint64(block.timestamp);
+        activePoolCount[organizer] += 1;
+        emit PoolOpenRegistered(organizer, msg.sender, lastOpenedAt[organizer], activePoolCount[organizer]);
+    }
+
+    function registerPoolFinalized(address organizer) external override onlyRegisteredPool {
+        if (activePoolCount[organizer] == 0) revert UnderflowOnFinalize();
+        activePoolCount[organizer] -= 1;
+        emit PoolFinalizedRegistered(organizer, msg.sender, activePoolCount[organizer]);
+    }
+
+    // ===== Admin =====
+
+    function setModules(address membership, address voting, address rep, address points, address impl)
+        external override onlyAdmin
+    {
+        _setModules(membership, voting, rep, points, impl);
+    }
+
+    function _setModules(address membership, address voting, address rep, address points, address impl) internal {
+        if (membership == address(0) || voting == address(0) || rep == address(0) || points == address(0) || impl == address(0))
             revert ZeroAddress();
-        }
-        if (!approvedMembershipModules[modules.membershipModule]) {
-            revert UnapprovedModule(ModuleType.Membership, modules.membershipModule);
-        }
-        if (!approvedContributionModules[modules.contributionModule]) {
-            revert UnapprovedModule(ModuleType.Contribution, modules.contributionModule);
-        }
-        if (!approvedReputationModules[modules.reputationModule]) {
-            revert UnapprovedModule(ModuleType.Reputation, modules.reputationModule);
-        }
+        membershipModule   = membership;
+        votingModule       = voting;
+        reputationModule   = rep;
+        reputationPoints   = points;
+        poolImplementation = impl;
+        emit ModulesUpdated(membership, voting, rep, points, impl);
     }
 
-    function _validateReputationConfig(ReputationConfig calldata reputationConfig) internal pure {
-        uint256 tierCount = reputationConfig.tierThresholds.length;
-        if (reputationConfig.maxTiers == 0 || tierCount == 0 || tierCount != reputationConfig.maxTiers) {
-            revert InvalidReputationConfig();
-        }
-        if (tierCount != reputationConfig.tierMultipliersBps.length) revert InvalidReputationConfig();
+    function setCooldownDuration(uint64 newSeconds) external override onlyAdmin {
+        cooldownDuration = newSeconds;
+        emit CooldownUpdated(newSeconds);
+    }
 
-        uint256 lastThreshold;
-        for (uint256 i = 0; i < tierCount; ++i) {
-            uint256 threshold = reputationConfig.tierThresholds[i];
-            if (i > 0 && threshold <= lastThreshold) revert InvalidReputationConfig();
-            uint256 multiplierBps = reputationConfig.tierMultipliersBps[i];
-            if (multiplierBps == 0 || multiplierBps > 10_000) revert InvalidReputationConfig();
-            lastThreshold = threshold;
-        }
+    function setMaxActivePools(uint16 newMax) external override onlyAdmin {
+        maxActivePoolsPerOrganizer = newMax;
+        emit MaxActivePoolsUpdated(newMax);
+    }
+
+    function setCoefficientBounds(uint16 minBps, uint16 maxBps) external override onlyAdmin {
+        if (minBps > maxBps) revert BoundsInvalid();
+        minCoeffBps = minBps;
+        maxCoeffBps = maxBps;
+        emit CoefficientBoundsUpdated(minBps, maxBps);
+    }
+
+    function setCreatePaused(bool paused) external override onlyAdmin {
+        createPaused_ = paused;
+        emit CreatePauseUpdated(paused);
+    }
+
+    function transferAdmin(address newAdmin) external override onlyAdmin {
+        if (newAdmin == address(0)) revert ZeroAddress();
+        address old = admin;
+        admin = newAdmin;
+        emit AdminTransferred(old, newAdmin);
     }
 }
-
-/*
-PHASE 2 DEFERRED
-- deposit logic
-- unit accounting
-- detailed event schema
-- metadata expansion
-- final contribution flow
-*/
