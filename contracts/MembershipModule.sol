@@ -81,7 +81,9 @@ contract MembershipModule is IMembershipModule {
 
     function setAdmin(address newAdmin) external onlyAdmin {
         if (newAdmin == address(0)) revert ZeroAddress();
+        address old = admin;
         admin = newAdmin;
+        emit AdminUpdated(old, newAdmin);
     }
 
     // ===== Views =====
@@ -90,6 +92,11 @@ contract MembershipModule is IMembershipModule {
         return _poolMemberTokenId[poolId][user] != 0;
     }
 
+    /// @notice Returns the timestamp the user's membership for this pool was originally minted.
+    /// @dev May return a non-zero value for a former owner after transfer (the field is never reset).
+    ///      Callers MUST cross-check `hasMembership(poolId, user)` before relying on this value.
+    ///      Voting consumers check `hasMembership` first; the former-owner timestamp is preserved
+    ///      so the underlying token's mint history stays auditable.
     function mintedAt(uint256 poolId, address user) external view override returns (uint64) {
         return _mintedAt[poolId][user];
     }
@@ -167,6 +174,9 @@ contract MembershipModule is IMembershipModule {
         emit Transfer(from, to, tokenId);
     }
 
+    /// @dev v1 omits the EIP-721 onERC721Received callback to keep the contract dependency-free.
+    ///      Smart-contract recipients that rely on the callback will NOT receive it. Off-chain
+    ///      indexers should track Transfer events instead.
     function safeTransferFrom(address from, address to, uint256 tokenId) external { transferFrom(from, to, tokenId); }
     function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata) external { transferFrom(from, to, tokenId); }
 
