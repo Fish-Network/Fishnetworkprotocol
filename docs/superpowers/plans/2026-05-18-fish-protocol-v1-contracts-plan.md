@@ -668,6 +668,11 @@ interface IReputationModule {
     // Authorization
     function authorizePool(address pool, uint256 poolId, uint16 dfBps) external;
 
+    // DF lifecycle (called by Pool at openContributions, before any mint into the pool).
+    // Implementations proxy to ReputationPoints.lockPoolDF since this module is the only
+    // address authorized to mint into the ledger.
+    function lockPoolDF(uint256 poolId, uint16 dfBps) external;
+
     // Capital path
     function recordDeposit(address user, uint256 poolId, uint256 depositId, uint256 amount, uint64 depositedAt) external;
     function finalizeCapital(address user, uint256 poolId, uint256 depositId, uint64 finalizedAt) external;
@@ -1108,6 +1113,13 @@ contract ReputationModule is IReputationModule {
         if (pool == address(0)) revert ZeroAddress();
         authorizedPoolByPoolId[poolId] = pool;
         emit PoolAuthorized(poolId, pool, dfBps);
+    }
+
+    /// @notice Called by the authorized Pool during openContributions(). Proxies to ReputationPoints.lockPoolDF.
+    /// @dev This module is the only registered minter on ReputationPoints, so it's the canonical
+    ///      caller for lockPoolDF. The Pool calls through here instead of touching the ledger directly.
+    function lockPoolDF(uint256 poolId, uint16 dfBps) external override onlyAuthorizedPool(poolId) {
+        reputationPoints.lockPoolDF(poolId, dfBps);
     }
 
     function isAuthorizedPool(address pool, uint256 poolId) external view override returns (bool) {
@@ -1945,7 +1957,8 @@ Insert before the final `}`:
         // Factory cooldown + max-active check.
         IUnredeemablePoolFactory(factory_).registerPoolOpen(organizer);
         // Lock DF before minting +1 (RepPoints requires DF lock to mint).
-        IReputationPoints(reputationPoints).lockPoolDF(poolId, reputationCoefficientBps);
+        // Routed via ReputationModule because ONLY that module is registered as a minter on RepPoints.
+        IReputationModule(reputationModule).lockPoolDF(poolId, reputationCoefficientBps);
         _transitionTo(LifecycleState.Open);
         IReputationModule(reputationModule).mintOrganizerMilestone(organizer, poolId, OrganizerMilestone.Open);
     }

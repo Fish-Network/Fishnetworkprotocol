@@ -16,6 +16,11 @@ interface IReputationModule {
     // Authorization
     function authorizePool(address pool, uint256 poolId, uint16 dfBps) external;
 
+    // DF lifecycle (called by Pool at openContributions, before any mint into the pool).
+    // Implementations proxy to ReputationPoints.lockPoolDF since this module is the only
+    // address authorized to mint into the ledger.
+    function lockPoolDF(uint256 poolId, uint16 dfBps) external;
+
     // Capital path
     function recordDeposit(address user, uint256 poolId, uint256 depositId, uint256 amount, uint64 depositedAt) external;
     function finalizeCapital(address user, uint256 poolId, uint256 depositId, uint64 finalizedAt) external;
