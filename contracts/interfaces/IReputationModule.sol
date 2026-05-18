@@ -12,6 +12,8 @@ interface IReputationModule {
     event OrganizerMilestoneFired(address indexed organizer, uint256 indexed poolId, OrganizerMilestone milestone, uint256 raw);
     event FPConstantsUpdated();
     event IdempotentReplayIgnored(bytes32 key);
+    event AdminUpdated(address indexed oldAdmin, address indexed newAdmin);
+    event VotingModuleUpdated(address indexed oldModule, address indexed newModule);
 
     // Authorization
     function authorizePool(address pool, uint256 poolId, uint16 dfBps) external;

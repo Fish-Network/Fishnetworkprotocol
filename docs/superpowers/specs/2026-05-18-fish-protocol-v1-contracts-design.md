@@ -414,9 +414,9 @@ sequenceDiagram
 |---|---|
 | Capital finalize | `keccak256("FP:capital:fin", poolId, depositId)` |
 | Vote FP | `keccak256("FP:vote", poolId, user)` |
-| Organizer open | `keccak256("FP:org:open", poolId)` |
-| Organizer settle | `keccak256("FP:org:settle", poolId)` |
-| Organizer distribute | `keccak256("FP:org:distribute", poolId)` |
+| Organizer open | `keccak256("FP:org", poolId, uint8(OrganizerMilestone.Open))` |
+| Organizer settle | `keccak256("FP:org", poolId, uint8(OrganizerMilestone.Settle))` |
+| Organizer distribute | `keccak256("FP:org", poolId, uint8(OrganizerMilestone.Distribute))` |
 
 `mapping(bytes32 => bool) public executed` on `ReputationModule`. Replay returns silently (no revert).
 

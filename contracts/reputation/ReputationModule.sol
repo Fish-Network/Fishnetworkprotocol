@@ -99,13 +99,18 @@ contract ReputationModule is IReputationModule {
 
     function setAdmin(address newAdmin) external onlyAdmin {
         if (newAdmin == address(0)) revert ZeroAddress();
+        address old = admin;
         admin = newAdmin;
+        emit AdminUpdated(old, newAdmin);
     }
 
     /// @notice One-time wire-up of the singleton VotingModule, called by admin after both contracts are deployed.
+    /// @dev Admin can re-call to rotate; the event makes the swap observable to indexers.
     function setVotingModule(address voting) external onlyAdmin {
         if (voting == address(0)) revert ZeroAddress();
+        address old = votingModule;
         votingModule = voting;
+        emit VotingModuleUpdated(old, voting);
     }
 
     // ===== Capital path =====
@@ -118,6 +123,8 @@ contract ReputationModule is IReputationModule {
         uint64  depositedAt
     ) external override onlyAuthorizedPool(poolId) {
         if (user == address(0)) revert ZeroAddress();
+        if (amount == 0) revert InvalidConfig();
+        if (amount > type(uint128).max) revert InvalidConfig();
         Deposit storage d = deposits[poolId][depositId];
         if (d.amount != 0) revert DepositAlreadyRecorded(poolId, depositId);
         d.amount       = uint128(amount);
