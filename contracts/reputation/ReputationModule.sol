@@ -107,4 +107,121 @@ contract ReputationModule is IReputationModule {
         if (voting == address(0)) revert ZeroAddress();
         votingModule = voting;
     }
+
+    // ===== Capital path =====
+
+    function recordDeposit(
+        address user,
+        uint256 poolId,
+        uint256 depositId,
+        uint256 amount,
+        uint64  depositedAt
+    ) external override onlyAuthorizedPool(poolId) {
+        if (user == address(0)) revert ZeroAddress();
+        Deposit storage d = deposits[poolId][depositId];
+        if (d.amount != 0) revert DepositAlreadyRecorded(poolId, depositId);
+        d.amount       = uint128(amount);
+        d.depositedAt  = depositedAt;
+        d.finalizedAt  = 0;
+        emit DepositRecorded(user, poolId, depositId, amount, depositedAt);
+    }
+
+    function finalizeCapital(
+        address user,
+        uint256 poolId,
+        uint256 depositId,
+        uint64  finalizedAt
+    ) external override onlyAuthorizedPool(poolId) {
+        bytes32 key = FishKeys.capitalFin(poolId, depositId);
+        if (executed[key]) { emit IdempotentReplayIgnored(key); return; }
+
+        Deposit storage d = deposits[poolId][depositId];
+        if (d.amount == 0) revert DepositNotRecorded(poolId, depositId);
+        if (finalizedAt < d.depositedAt) finalizedAt = d.depositedAt;
+        d.finalizedAt = finalizedAt;
+
+        uint256 daysHeld = FishMath.daysBetween(d.depositedAt, finalizedAt);
+        uint256 raw = (uint256(d.amount) * daysHeld) / uint256(_constants.capitalDayDivisor);
+
+        executed[key] = true;
+        if (raw > 0) {
+            reputationPoints.mint(user, poolId, raw, FPCategory.Capital);
+        }
+        emit CapitalFinalized(user, poolId, depositId, raw);
+    }
+
+    // ===== Vote path =====
+
+    function mintVoteFP(
+        address user,
+        uint256 poolId,
+        uint64  firstCastAt,
+        uint64  roundStart,
+        uint64  roundEnd,
+        Outcome choice,
+        Outcome winning
+    ) external override onlyVotingModule {
+        bytes32 key = FishKeys.voteFP(poolId, user);
+        if (executed[key]) { emit IdempotentReplayIgnored(key); return; }
+
+        uint256 raw = _computeVoteFP(firstCastAt, roundStart, roundEnd, choice, winning);
+        executed[key] = true;
+        if (raw > 0) {
+            reputationPoints.mint(user, poolId, raw, FPCategory.Participation);
+        }
+        emit VoteFPMinted(user, poolId, raw);
+    }
+
+    function _computeVoteFP(
+        uint64  firstCastAt,
+        uint64  roundStart,
+        uint64  roundEnd,
+        Outcome choice,
+        Outcome winning
+    ) internal view returns (uint256) {
+        if (roundEnd <= roundStart) return 0;
+        uint256 progressBps = (uint256(firstCastAt - roundStart) * 10_000) / uint256(roundEnd - roundStart);
+        progressBps = FishMath.clampToBps(progressBps, 10_000);
+
+        uint16 timingMult = FishMath.timingBucket(
+            progressBps,
+            _constants.earlyEndBps,
+            _constants.lateStartBps,
+            _constants.earlyMultBps,
+            _constants.standardMultBps,
+            _constants.lateMultBps
+        );
+
+        bool isCorrect = (winning != Outcome.None)
+                      && (choice == winning)
+                      && (progressBps < _constants.lateStartBps);
+
+        uint256 base = uint256(_constants.baseVote)
+                     + (isCorrect ? uint256(_constants.accuracyBonus) : 0);
+
+        return FishMath.applyBps(base, timingMult);
+    }
+
+    // ===== Organizer milestone path =====
+
+    function mintOrganizerMilestone(
+        address organizer,
+        uint256 poolId,
+        OrganizerMilestone milestone
+    ) external override onlyAuthorizedPool(poolId) {
+        bytes32 key = FishKeys.organizerMilestone(poolId, milestone);
+        if (executed[key]) { emit IdempotentReplayIgnored(key); return; }
+
+        uint256 raw =
+              milestone == OrganizerMilestone.Open       ? uint256(_constants.organizerOpenFP)
+            : milestone == OrganizerMilestone.Settle     ? uint256(_constants.organizerSettleFP)
+            : milestone == OrganizerMilestone.Distribute ? uint256(_constants.organizerDistributeFP)
+            : 0;
+
+        executed[key] = true;
+        if (raw > 0) {
+            reputationPoints.mint(organizer, poolId, raw, FPCategory.Participation);
+        }
+        emit OrganizerMilestoneFired(organizer, poolId, milestone, raw);
+    }
 }
