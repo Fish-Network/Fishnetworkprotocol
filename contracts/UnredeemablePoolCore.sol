@@ -213,4 +213,120 @@ contract UnredeemablePoolCore is IUnredeemablePoolCore, ReentrancyGuard {
         lifecycleState = next;
         emit PoolStateTransitioned(poolId, prev, next);
     }
+
+    // ===== Lifecycle transitions =====
+
+    function openContributions()
+        external override onlyOrganizer inState(LifecycleState.Draft)
+    {
+        if (openTime != 0 && block.timestamp < openTime) revert CooldownNotElapsed();
+
+        // Factory cooldown + max-active check.
+        IUnredeemablePoolFactory(factory_).registerPoolOpen(organizer);
+        // Lock DF before minting +1 (RepPoints requires DF lock to mint).
+        // Routed via ReputationModule because ONLY that module is registered as a minter on RepPoints.
+        IReputationModule(reputationModule).lockPoolDF(poolId, reputationCoefficientBps);
+        _transitionTo(LifecycleState.Open);
+        IReputationModule(reputationModule).mintOrganizerMilestone(organizer, poolId, OrganizerMilestone.Open);
+    }
+
+    function activatePool()
+        external override onlyOrganizer inState(LifecycleState.Open)
+    {
+        IVotingModule(votingModule).openRound(poolId, uint64(block.timestamp));
+        _transitionTo(LifecycleState.Active);
+    }
+
+    function closePool() external override {
+        // Allowed callers: organizer always; anyone if past closeTime.
+        if (msg.sender != organizer && (closeTime == 0 || block.timestamp < closeTime)) revert NotOrganizer();
+        if (lifecycleState != LifecycleState.Open && lifecycleState != LifecycleState.Active)
+            revert WrongState(LifecycleState.Active, lifecycleState);
+
+        IVotingModule(votingModule).closeRound(poolId, uint64(block.timestamp));
+
+        bool success = _evaluateSuccess();
+        _transitionTo(LifecycleState.Closed);
+
+        if (!success) {
+            _transitionToFailed();
+        }
+    }
+
+    function _evaluateSuccess() internal view returns (bool) {
+        if (successRule == SuccessRule.MinContributionReached) {
+            return totalAssetsCommitted >= minContribution;
+        }
+        if (successRule == SuccessRule.AnyCapitalRaised) {
+            return totalAssetsCommitted > 0;
+        }
+        if (successRule == SuccessRule.FullCapOnly) {
+            return totalAssetsCommitted == uint256(poolCap);
+        }
+        return false;
+    }
+
+    function _transitionToFailed() internal {
+        _transitionTo(LifecycleState.Failed);
+        IUnredeemablePoolFactory(factory_).registerPoolFinalized(organizer);
+        // Record None as the "winning outcome" so claimVoteFP can still pay out base × timing.
+        IVotingModule(votingModule).recordWinningOutcome(poolId, Outcome.None);
+        emit PoolFailed(poolId);
+    }
+
+    function settle(Outcome winning)
+        external override onlyOrganizer inState(LifecycleState.Closed)
+    {
+        if (winning == Outcome.None) revert InvalidConfig();
+
+        settledAt           = uint64(block.timestamp);
+        poolBalanceAtSettle = IERC20(acceptedAsset).balanceOf(address(this));
+        totalSupplyAtSettle = _totalSupply;
+        winningOutcome      = winning;
+
+        // Snapshot per-depositor units for distribution math.
+        for (uint256 i = 0; i < _depositors.length; i++) {
+            _unitsAtSettle[_depositors[i]] = _balances[_depositors[i]];
+        }
+
+        _transitionTo(LifecycleState.Settled);
+        IVotingModule(votingModule).recordWinningOutcome(poolId, winning);
+        IReputationModule(reputationModule).mintOrganizerMilestone(organizer, poolId, OrganizerMilestone.Settle);
+
+        emit PoolSettled(poolId, winning, settledAt, poolBalanceAtSettle, totalSupplyAtSettle);
+    }
+
+    function distribute(uint256 offset, uint256 count)
+        external override inState(LifecycleState.Settled)
+    {
+        uint256 n = _depositors.length;
+        uint256 end = offset + count;
+        if (end > n) revert DistributionOOB();
+        if (_processedCount >= n) revert DistributionAlreadyComplete();
+
+        for (uint256 i = offset; i < end; i++) {
+            address d = _depositors[i];
+            if (_distributed[d]) continue;
+            uint256 units = _unitsAtSettle[d];
+            if (units == 0) { _distributed[d] = true; _processedCount += 1; continue; }
+            uint256 share = (units * poolBalanceAtSettle) / totalSupplyAtSettle;
+            _distributed[d] = true;
+            _processedCount += 1;
+            if (share > 0) {
+                IERC20(acceptedAsset).safeTransfer(d, share);
+                emit DistributedTo(poolId, d, share);
+            }
+        }
+
+        if (!firstDistributePinged && _processedCount > 0) {
+            firstDistributePinged = true;
+            IReputationModule(reputationModule).mintOrganizerMilestone(organizer, poolId, OrganizerMilestone.Distribute);
+        }
+
+        if (_processedCount == n) {
+            _transitionTo(LifecycleState.Distributed);
+            IUnredeemablePoolFactory(factory_).registerPoolFinalized(organizer);
+            emit PoolDistributed(poolId);
+        }
+    }
 }
