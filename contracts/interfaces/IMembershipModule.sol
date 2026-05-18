@@ -5,6 +5,7 @@ interface IMembershipModule {
     event MembershipIssued(uint256 indexed poolId, address indexed to, uint256 indexed tokenId, uint64 mintedAt);
     event PoolMinterUpdated(address indexed minter, bool allowed);
     event PoolBaseURISet(uint256 indexed poolId, string baseURI);
+    event AdminUpdated(address indexed oldAdmin, address indexed newAdmin);
 
     function hasMembership(uint256 poolId, address user) external view returns (bool);
     function mintedAt(uint256 poolId, address user) external view returns (uint64);
