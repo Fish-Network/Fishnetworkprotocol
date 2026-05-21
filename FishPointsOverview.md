@@ -33,6 +33,18 @@ This creates a balanced system where both **what you commit** and **how you act*
 
 ---
 
+### Discount Factor (DF)
+
+Each pool has a per-pool **Discount Factor** that scales the FP earned in that pool.
+
+```text
+FP(total) = (FP(capital) + FP(participation)) × DF
+```
+
+DF defaults to 1.0× (no change to existing examples). It is set per pool at creation, locked once the pool opens, and bounded by protocol-level minimum/maximum. See `Points.md` for full details.
+
+---
+
 ## Why It Matters
 
 Traditional systems reward:

@@ -311,3 +311,45 @@ Where:
 * Execution = organizing
 
 ---
+
+# 11. Combined Example with DF = 0.5×
+
+## Scenario
+
+Same setup as Example 8 — a Fish who:
+
+* deposits $2,000 for 30 days
+* votes early and correctly
+* in a pool where the organizer set DF = 0.5× (5000 bps)
+
+### Capital (raw)
+
+FP_capital_raw = 2000 × (30 / 30) = 2000
+
+### Participation (raw)
+
+FP_vote_raw = (1 + 2) × 1.5 = 4.5
+
+### Apply DF
+
+```
+FP_pool_total = (2000 + 4.5) × 0.5 = 1002.25
+```
+
+### What the contracts show
+
+* `getPoolCapital(user, poolId)`         = 2000
+* `getPoolParticipation(user, poolId)`   = 4.5
+* `getPoolTotal(user, poolId)`           = 1002.25
+* `getCapitalPoints(user)`               = 2000 (raw, no DF applied)
+* `getParticipationPoints(user)`         = 4.5 (raw, no DF applied)
+* `getTotalPoints(user)`                 = 1002.25 (effective, DF applied)
+
+### Interpretation
+
+* Raw counters preserve audit history.
+* DF scales the *effective* total — the value used for reputation comparisons and access.
+* DF = 0.5× discounts the entire pool's reputation by half.
+* DF = 2.0× would double it; DF = 1.0× (default) leaves it unchanged.
+
+---

@@ -119,10 +119,10 @@ draft → open → active → closed → settled → distributed
   Pool is created but not yet active
 
 * **open**
-  Pool is validated and available for participation
+  Deposits are accepted. Voting is NOT yet open. Membership NFTs auto-mint on first deposit.
 
 * **active**
-  Capital is being contributed and/or voting is live
+  Deposits are FROZEN. Voting is OPEN. The active-start timestamp anchors the timing-bucket math for voter FP.
 
 * **closed**
   Participation window has ended
@@ -132,6 +132,12 @@ draft → open → active → closed → settled → distributed
 
 * **distributed**
   Participants receive outcomes (e.g. returns)
+
+---
+
+### Open ≠ Active
+
+The Pool deliberately separates deposits and voting into two distinct phases. Open accepts deposits; Active accepts votes. This prevents the late-deposit-for-early-vote-bonus race condition. The transition between them is a manual organizer action (`activatePool()`) that freezes deposits and opens the round in one step.
 
 ---
 
@@ -286,6 +292,14 @@ Fish Pools provide a **structured environment for capital coordination** where:
 They are the core infrastructure that enables:
 
 > transparent, outcome-driven coordination in private capital markets.
+
+---
+
+## Distribution
+
+### Paginated distribution
+
+`distribute(offset, count)` pays out a slice of depositors per call. Pools with many depositors use multiple `distribute` transactions; the pool transitions to `Distributed` automatically when the last batch completes. The first batch that actually moves money fires the organizer's +25 milestone.
 
 ---
 
