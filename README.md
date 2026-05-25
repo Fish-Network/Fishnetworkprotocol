@@ -4,7 +4,7 @@ Open-source smart-contract suite for **reputation-driven capital pooling**. Anyo
 
 This repository contains the Solidity source files only. No npm, no Foundry, no Hardhat. Import the `.sol` files into your own dev environment (Remix, Foundry, Hardhat) to deploy.
 
-# Protocol for Reputation-based Capital Pooling
+# Reputation-based Capital Pooling
 
 Community-driven investing faltered not because blockchain failed to deliver on its trust-less nature. It faltered because there was missing trust infrastructure amongst the humans using the blockchain.
 
