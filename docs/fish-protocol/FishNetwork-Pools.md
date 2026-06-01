@@ -280,6 +280,14 @@ Fish Pools are **active coordination environments**, not passive systems.
 
 ---
 
+## Distribution
+
+### Paginated distribution
+
+`distribute(offset, count)` pays out a slice of depositors per call. Pools with many depositors use multiple `distribute` transactions; the pool transitions to `Distributed` automatically when the last batch completes. The first batch that actually moves money fires the organizer's +25 Fish Points milestone.
+
+---
+
 ## Summary
 
 Fish Pools provide a **structured environment for capital coordination** where:
@@ -294,17 +302,3 @@ They are the core infrastructure that enables:
 > transparent, outcome-driven coordination in private capital markets.
 
 ---
-
-## Distribution
-
-### Paginated distribution
-
-`distribute(offset, count)` pays out a slice of depositors per call. Pools with many depositors use multiple `distribute` transactions; the pool transitions to `Distributed` automatically when the last batch completes. The first batch that actually moves money fires the organizer's +25 Fish Points milestone.
-
----
-
-## Related
-
-* Fish Points — reputation system(Coming Soon)
-* Developer Guide — integration and APIs(Coming Soon)
-* Examples — scoring walkthroughs(Coming Soon)
