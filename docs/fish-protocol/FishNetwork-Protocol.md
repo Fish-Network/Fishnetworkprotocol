@@ -282,7 +282,7 @@ into a system where:
 
 > capital, participation, and outcomes are aligned through reputation.
 
-# Fish Protocol
+# Fish Protocol FAQs
 
 ## What is Fish Protocol?
 
