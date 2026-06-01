@@ -26,14 +26,15 @@ Fish Network introduces a new standard to track investor reputation and track re
 
 | Audience | Read |
 |---|---|
-| Concept overview | [FishNetworkREADME.md](FishNetworkREADME.md), [FishProtocol-v.01.md](FishProtocol-v.01.md) |
-| Pools detail | [Poolsreadme.md](Poolsreadme.md) |
-| Fish Points (reputation) | [Points.md](Points.md), [FishPointsOverview.md](FishPointsOverview.md), [PointsExamples.md](PointsExamples.md) |
-| Developer integration | [DeveloperDocs.md](DeveloperDocs.md) |
-| Legal positioning | [LegalSummary.md](LegalSummary.md) |
-| Contract state machine | [contracts/statemachine.md](contracts/statemachine.md) |
-| Storage layout reference | [contracts/storagelayout.md](contracts/storagelayout.md) |
-| Manual test plan | [contracts/TestPlan.md](contracts/TestPlan.md) |
+| Concept overview | [docs/fish-protocol/FishNetwork-README.md](docs/fish-protocol/FishNetwork-README.md), [docs/fish-protocol/FishNetwork-Protocol.md](docs/fish-protocol/FishNetwork-Protocol.md) |
+| Pools detail | [docs/fish-protocol/FishNetwork-Pools.md](docs/fish-protocol/FishNetwork-Pools.md) |
+| Fish Points (reputation) | [docs/fish-points/FishPoints-Overview.md](docs/fish-points/FishPoints-Overview.md), [docs/fish-points/FishPoints-Details.md](docs/fish-points/FishPoints-Details.md), [docs/fish-points/FishPoints-Examples.md](docs/fish-points/FishPoints-Examples.md) |
+| Developer integration | [docs/fish-points/FishPoints-DeveloperDocs.md](docs/fish-points/FishPoints-DeveloperDocs.md) |
+| Legal positioning (Points) | [docs/fish-points/FishPoints-LegalSummary.md](docs/fish-points/FishPoints-LegalSummary.md) |
+| Legal positioning (Pools) | [docs/fish-protocol/FishNetwork-LegalSummaryPools.md](docs/fish-protocol/FishNetwork-LegalSummaryPools.md) |
+| Contract state machine | [contracts/docs/FishNetwork-StateMachine.md](contracts/docs/FishNetwork-StateMachine.md) |
+| Storage layout reference | [contracts/docs/FishNetwork-StorageLayout.md](contracts/docs/FishNetwork-StorageLayout.md) |
+| Manual test plan | [contracts/docs/FishNetwork-TestPlan.md](contracts/docs/FishNetwork-TestPlan.md) |
 | Design spec (v1) | [docs/superpowers/specs/2026-05-18-fish-protocol-v1-contracts-design.md](docs/superpowers/specs/2026-05-18-fish-protocol-v1-contracts-design.md) |
 
 ## System architecture
@@ -79,7 +80,7 @@ stateDiagram-v2
     Distributed --> [*]
 ```
 
-See [contracts/statemachine.md](contracts/statemachine.md) for the full transition reference.
+See [contracts/docs/FishNetwork-StateMachine.md](contracts/docs/FishNetwork-StateMachine.md) for the full transition reference.
 
 ## Fish Points issuance flow
 
@@ -180,26 +181,6 @@ Raw `FP_capital` and `FP_participation` are stored unscaled. Only the effective 
 getPoolTotal(u, p) == (getPoolCapital(u, p) + getPoolParticipation(u, p)) × poolDF(p) / 10_000
 ```
 
-## Repository layout
-
-```
-contracts/
-  UnredeemablePoolFactory.sol     ← singleton, deploys pool clones
-  UnredeemablePoolCore.sol         ← clone implementation
-  MembershipModule.sol             ← pool-scoped NFTs
-  voting/
-    VotingModule.sol               ← vote registry + finalize
-  reputation/
-    ReputationModule.sol           ← formula engine
-    ReputationPoints.sol           ← canonical FP ledger
-  interfaces/                      ← one file per interface
-  types/                           ← enums and structs
-  libraries/                       ← vendored helpers (SafeERC20, ReentrancyGuard, FishMath, FishKeys, MinimalClones)
-  TestPlan.md
-  statemachine.md
-  storagelayout.md
-```
-
 ## Build / use
 
 This repo intentionally ships pure `.sol` files. To compile:
@@ -222,18 +203,18 @@ cd fish-protocol && forge build
 3. Copy `contracts/*` into `contracts/` of the new project.
 4. `npx hardhat compile`.
 
-No deployment scripts are included; consult [contracts/TestPlan.md](contracts/TestPlan.md) for the recommended deploy order.
+No deployment scripts are included; consult [contracts/docs/FishNetwork-TestPlan.md](contracts/docs/FishNetwork-TestPlan.md) for the recommended deploy order.
 
 ## Contracts at a glance
 
-| Contract | Role | Singleton? |
-|---|---|---|
-| `UnredeemablePoolFactory` | Deploy pool clones; anti-gaming counters | ✓ |
-| `UnredeemablePoolCore` | Lifecycle + capital + voting wiring | ✗ (one clone per pool) |
-| `MembershipModule` | Pool-scoped membership NFTs | ✓ |
-| `VotingModule` | Vote registry, timing, finalize trigger | ✓ |
-| `ReputationModule` | FP formula engine + idempotency | ✓ |
-| `ReputationPoints` | Mint-only, non-transferable FP ledger | ✓ |
+| Contract | File | Role | Singleton? |
+|---|---|---|---|
+| `UnredeemablePoolFactory` | `contracts/UnredeemablePoolFactory.sol` | Deploy pool clones; anti-gaming counters | ✓ |
+| `UnredeemablePoolCore` | `contracts/UnredeemablePoolCore.sol` | Lifecycle + capital + voting wiring | ✗ (one clone per pool) |
+| `MembershipModule` | `contracts/MembershipModule.sol` | Pool-scoped membership NFTs | ✓ |
+| `VotingModule` | `contracts/voting/VotingModule.sol` | Vote registry, timing, finalize trigger | ✓ |
+| `ReputationModule` | `contracts/reputation/ReputationModule.sol` | FP formula engine + idempotency | ✓ |
+| `ReputationPoints` | `contracts/reputation/ReputationPoints.sol` | Mint-only, non-transferable FP ledger | ✓ |
 
 ## Anti-gaming
 
@@ -243,10 +224,6 @@ The Factory enforces two on-chain rules:
 - **Max active pools per organizer:** 3 simultaneous pools in any non-terminal state. Paused pools still count.
 
 Both are tunable by the Factory admin. Wallet verification (Sybil resistance) is intentionally off-chain — the membership NFT serves as the on-chain signal that an off-chain verification step happened.
-
-# Summary
-
-Fish Network has developed the basic infrastructure needed to enable investors to pool capital with confidence. No overhead, no middle-men taking fees, no custodians. We believe this infrastructure should be available as a public good to everyone, and can be used for any use case. While investor trust is technically a non-financial asset, we believe it has very real, financial implications in the long-run. Fish Pools, together with Fish Points, enable the foundation for reputation-based capital to be deployed into traditional private markets at scale.
 
 # Release Timeline
 
