@@ -299,7 +299,7 @@ They are the core infrastructure that enables:
 
 ### Paginated distribution
 
-`distribute(offset, count)` pays out a slice of depositors per call. Pools with many depositors use multiple `distribute` transactions; the pool transitions to `Distributed` automatically when the last batch completes. The first batch that actually moves money fires the organizer's +25 milestone.
+`distribute(offset, count)` pays out a slice of depositors per call. Pools with many depositors use multiple `distribute` transactions; the pool transitions to `Distributed` automatically when the last batch completes. The first batch that actually moves money fires the organizer's +25 Fish Points milestone.
 
 ---
 
