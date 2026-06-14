@@ -14,7 +14,7 @@
 
 Fish Network is a **reputation-based capital coordination system**. Fish Network has built Fish Protocol — capital pooling infrastructure applied directly to financial services use cases, venture capital specifically, and private markets broadly.
 
-Basic capital pooling infrastructure should be a right, not a privilege. We released Fish Protocol open source so anyone can pool capital for use cases outside of financial services, such as social reasons or non-profits.
+Basic capital pooling infrastructure should be a right, not a privilege. We released Fish Protocol open source so anyone can pool capital for use cases outside of financial services, such as social activies or non-profits.
 
 It combines:
 
