@@ -12,7 +12,9 @@
 
 ## Overview
 
-Fish Network is a **reputation-based capital coordination system**.
+Fish Network is a **reputation-based capital coordination system**. Fish Network has built Fish Protocol — capital pooling infrastructure applied directly to financial services use cases, venture capital specifically, and private markets broadly.
+
+Basic capital pooling infrastructure should be a right, not a privilege. We released Fish Protocol open source so anyone can pool capital for use cases outside of financial services, such as social reasons or non-profits.
 
 It combines:
 
@@ -309,12 +311,6 @@ Markets are transparent, but all investor information is private by default. All
 ## What are Fish Points? What aren't Fish Points?
 
 Fish points are not a narrative-driven, gamified social all-in-one investor reputation score. Fish Points are the scorekeeping ledger for an evidence driven attestation network, where off-chain documents and records are verified and subsequently etched on-chain.
-
-# Fish Pool FAQs
-
-Fish Network has built Fish Protocol — capital pooling infrastructure applied directly to financial services use cases, venture capital specifically, and private markets broadly.
-
-Basic capital pooling infrastructure should be a right, not a privilege. We released Fish Protocol open source so anyone can pool capital for use cases outside of financial services, such as social reasons or non-profits.
 
 ## What is an example use case of Fish Protocol?
 
