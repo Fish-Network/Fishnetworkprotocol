@@ -99,7 +99,7 @@ Participation quality matters—not just participation.
 
 ### 3. Organizer Reputation
 
-Organizers earn reputation by executing successful Pools.
+Organizers earn reputation by executing successful Pools and Schools.
 
 * Open Pool → +1
 * Successful Close → +5
