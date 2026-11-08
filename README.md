@@ -26,7 +26,7 @@ Fish Network introduces a new standard to track investor reputation and track re
 
 | Audience | Read |
 |---|---|
-| Technical whitepaper (V3 draft) | [Fish Network Technical Whitepaper](docs/fish-protocol/FishNetwork-Technical-Whitepaper.md) |
+| Technical whitepaper (V3 draft) | [Fish Network Technical Whitepaper](docs/FishNetwork-Technical-Whitepaper.md) |
 | Concept overview | [docs/fish-protocol/FishNetwork-README.md](docs/fish-protocol/FishNetwork-README.md), [docs/fish-protocol/FishNetwork-Protocol.md](docs/fish-protocol/FishNetwork-Protocol.md) |
 | Pools detail | [docs/fish-protocol/FishNetwork-Pools.md](docs/fish-protocol/FishNetwork-Pools.md) |
 | Fish Points (reputation) | [docs/fish-points/FishPoints-Overview.md](docs/fish-points/FishPoints-Overview.md), [docs/fish-points/FishPoints-Details.md](docs/fish-points/FishPoints-Details.md), [docs/fish-points/FishPoints-Examples.md](docs/fish-points/FishPoints-Examples.md) |

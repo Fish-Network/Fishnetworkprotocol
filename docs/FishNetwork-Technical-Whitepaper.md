@@ -40,7 +40,7 @@ The protocol issues no token, runs no consensus mechanism of its own, and has no
 
 > **In short.** An organizer forms a fund and invites people into it. Those who join decide together what it invests in, and share whatever comes back. Everything below is the detail of making that auditable and difficult to get wrong.
 
-![The whole system, in one picture](../../assets/image1.png)
+![The whole system, in one picture](../assets/image1.png)
 
 **Four things this design insists on**, each of which costs something:
 
@@ -93,7 +93,7 @@ Legal reality stays off-chain and authoritative. The chain is the register (the 
 
 ### 3.1 Architecture
 
-![3.1 Architecture](../../assets/image2.png)
+![3.1 Architecture](../assets/image2.png)
 
 **There are three separate yield relationships.**
 
@@ -251,7 +251,7 @@ Every upgrade path — UUPS \_authorizeUpgrade, beacon upgradeTo, orchestrator p
 
 ### 6.2 The authoritative lifecycle
 
-![6.2 The authoritative lifecycle](../../assets/image3.png)
+![6.2 The authoritative lifecycle](../assets/image3.png)
 
 | Stage        | Means                                                                                                |
 |--------------|------------------------------------------------------------------------------------------------------|
@@ -284,7 +284,7 @@ if (next == Status.CLOSED)       require(prev == Status.WINDING_DOWN, "CLOSE_NEE
 
 > **In short.** The organizer sets the terms and the deadline, the platform checks the business is real and the bank account approved, and only then can the fund launch. After that it is investors depositing against a clock.
 
-![7.1 Creating a school](../../assets/image9.png)
+![7.1 Creating a school](../assets/image9.png)
 
 The FSO completes a wizard — basic info → entity → treasury wallet → terms → review — and launch deploys the six-contract stack. **Two things gate the launch button**: the organizer’s business must be KYB-verified, and the treasury wallet must be on the platform whitelist. Neither can be satisfied after the fact, because both decide where members’ money is allowed to go.
 
@@ -356,7 +356,7 @@ On testnet the adapter is StubAavePool at 1:1, so there is no yield to accrue ei
 
 ### 7.5 The close waterfall
 
-![7.5 The close waterfall](../../assets/image10.png)
+![7.5 The close waterfall](../assets/image10.png)
 
 Two properties of this waterfall are worth stating precisely, because both are easy to misread:
 
@@ -465,7 +465,7 @@ It cuts both ways. An administrator can approve a relaunch **sooner than 14 days
 
 **The life of a deal**, from proposal to closed:
 
-![9. Governance](../../assets/image8.png)
+![9. Governance](../assets/image8.png)
 
 Everything the members are agreeing to is settled **before** the vote — the amount, whether their capital returns, and what the organizer earns. Nothing in those terms can be changed afterwards, which is why the ballot is the only place they appear.
 
@@ -668,7 +668,7 @@ Steps 2 and 4 are **permissionless on-chain** — the contract accepts them from
 
 **The point of permissionless is what happens when the keeper does not.** If the backend is down, misconfigured, or unwilling, the organizer or any member can send the same transaction themselves and the payout completes. The payout mechanism does not depend on Fish Network continuing to operate, and the money in it is never Fish Network’s: distributions are made by the organizer, who must follow the school’s legal documents, and none of it is available to Fish Network’s creditors. A keeper that stops is a delay, not a loss.
 
-![11.1 The four-step protocol](../../assets/image5.png)
+![11.1 The four-step protocol](../assets/image5.png)
 
 ### 11.2 The deposit vault
 
@@ -721,7 +721,7 @@ EXECUTED means capital left the contract, not that the deal is over. Without a f
 
 Closure is therefore an explicit two-party act, held entirely off-chain:
 
-![11.4 Marking a deal finished](../../assets/image4.png)
+![11.4 Marking a deal finished](../assets/image4.png)
 
 Only reachable from EXECUTED or VERIFIED: a deal that never deployed capital is denied, failed or expired rather than closed. A remark is mandatory and a supporting document optional, because the reviewer has nothing else to judge on.
 
@@ -733,7 +733,7 @@ Nothing on-chain needs to know a deal stopped producing, so this lives in the da
 
 > **In short.** A member who wants out before the fund closes can sell their position instead of forcing the fund to sell an investment early. The position is offered to the school’s **own members first, for 30 days**. If nobody in the school takes it, it is then offered to **every verified investor on Fish Network for the next 60 days**. After 90 days in total the listing expires, and the member lists it again if they still want to sell.
 
-![12. Secondary market](../../assets/image6.png)
+![12. Secondary market](../assets/image6.png)
 
 > **Example.** Priya holds \$40,000 of a school and wants to sell \$10,000 of it. She lists it on 1 March. For the first 30 days only her fellow members see it; one of them buys \$4,000 worth. On 31 March the remaining \$6,000 becomes available to every verified investor on the platform, and an investor from outside the school buys it on 12 April — they are given a seat in the school as part of the purchase. Had nobody bought it, the listing would have expired on 30 May and Priya could have listed it again.
 
@@ -787,7 +787,7 @@ The isolation argument for per-school positions — that one school’s illiquid
 
 ### 13.3 Ledger, orchestrator, actors
 
-![13.3 Ledger, orchestrator, actors](../../assets/image7.png)
+![13.3 Ledger, orchestrator, actors](../assets/image7.png)
 
 Three parts, split by what changes and how often:
 
